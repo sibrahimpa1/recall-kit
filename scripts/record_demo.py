@@ -73,6 +73,16 @@ def main() -> None:
         "resume.svg",
         env,
     )
+    record(
+        "recall-kit: a paraphrased question, the same question as of an earlier date, and an unanswerable one",
+        [
+            'rk recall "how long does the candle company have to settle a bill?" -k 1',
+            'rk recall "how long does the candle company have to settle a bill?" -k 1 --as-of 2026-10-25',
+            'rk recall "what is the capital of Mongolia?"',
+        ],
+        "time-travel.svg",
+        env,
+    )
     console = Console(record=True, width=120, force_terminal=True)
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "-m", "continuity", "-v", "-p", "no:cacheprovider", "--color=yes"],

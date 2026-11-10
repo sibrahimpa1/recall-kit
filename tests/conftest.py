@@ -23,6 +23,10 @@ import pytest
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters
 
+# The suite runs on the zero-dependency embedder so results are identical with or without the
+# optional semantic model; tests/test_semantic.py covers the semantic model separately.
+os.environ.setdefault("RECALL_EMBEDDER", "hashing")
+
 SERVER_CMD = [sys.executable, "-m", "recall_kit.cli", "serve"]
 
 
@@ -55,7 +59,7 @@ def run_session(
         params = StdioServerParameters(
             command=SERVER_CMD[0],
             args=SERVER_CMD[1:],
-            env={"RECALL_HOME": str(home), **(env or {})},
+            env={"RECALL_HOME": str(home), "RECALL_EMBEDDER": os.environ["RECALL_EMBEDDER"], **(env or {})},
         )
         async with Client(params) as client:
             return await script(Session(client))
@@ -79,11 +83,13 @@ def run_http_session(url: str, token: str | None, script: Callable[[Session], Aw
     return asyncio.run(main())
 
 
-def one_call(home: Path, tool: str, **args: Any) -> Any:
+def one_call(home: Path, tool: str, *, at: str | None = None, **args: Any) -> Any:
+    """One tool call in its own fresh session. `at` sets the session's clock (demo/test clock)."""
+
     async def script(s: Session) -> Any:
         return await s.call(tool, **args)
 
-    return run_session(home, script)
+    return run_session(home, script, env={"RECALL_NOW": at} if at else None)
 
 
 def cli(home: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:

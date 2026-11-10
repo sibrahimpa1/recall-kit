@@ -13,6 +13,8 @@ memory is enough and costs nothing extra. Build or run something like recall-kit
 | Full version history | no | no | page history (paid plans) | git, every change |
 | Correction semantics (old value never served as current) | best-effort, model-driven | best-effort, model-driven | manual editing | enforced: `correct` supersedes, tested |
 | Provable deletion | delete in settings; no proof of what was removed from derived data | same | trash, then permanent delete | file + git history + FTS + vectors scrubbed, with a test that checks every layer |
+| "What did it know on date X?" | no | no | page history, per page | yes: `--as-of`, any date |
+| Import existing memory | n/a | n/a | n/a | pasted memory lists, markdown/Notion folders, with sources |
 | Every answer cites its memory | no | partly (project files) | partly (Q&A citations) | yes: `[mem:id]`, file, commit |
 | Project status / blockers / next steps / follow-ups | free-form | free-form | yes (databases), strong UI | yes (structured, plus `resume` and `brief`) |
 | Prompt-injection handling for stored text | vendor-side | vendor-side | n/a | quarantine on write, data envelope on read |
@@ -54,9 +56,12 @@ The assistants' own subscriptions don't change. recall-kit adds a shared memory 
 
 ## Known limits of recall-kit (honest list)
 
-- The default embedder is lexical feature hashing: no download, works offline, but it is not semantic.
-  A paraphrase with no shared words or word stems can miss. A real embedding model is a one-class
-  plug-in (`docs/handover.md` §7).
+- Retrieval is measured, and it is not perfect: with the local semantic model about two thirds of
+  reworded questions get the right memory first and about four fifths in the top three
+  (`evals/retrieval_bench.py`, 36 memories). Without the semantic extra, recall is keyword-level.
+- The local model is English-first. Other languages need a multilingual model (one class, see
+  `docs/handover.md` §7).
+- Vector search is a linear scan in Python: fine for thousands of memories, not for millions.
 - Conflict detection is heuristic (similar text plus different numbers or negation). It flags likely
   contradictions, not all of them. Single-valued facts should use a `key`, which is exact.
 - Prompt-injection screening is pattern-based. It is defence in depth together with the data envelope

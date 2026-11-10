@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import re
 import sqlite3
 from pathlib import Path
@@ -29,10 +30,90 @@ CREATE TABLE IF NOT EXISTS conflicts (
 """
 
 _TOKEN = re.compile(r"\w+", re.UNICODE)
+# Function words carry no topic: without this, "what is the gate code" keyword-matches every
+# memory that contains "the".
+STOPWORDS = frozenset(
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "did",
+        "do",
+        "does",
+        "for",
+        "from",
+        "had",
+        "has",
+        "have",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "its",
+        "me",
+        "my",
+        "of",
+        "on",
+        "or",
+        "our",
+        "s",
+        "she",
+        "so",
+        "t",
+        "that",
+        "the",
+        "their",
+        "them",
+        "they",
+        "this",
+        "to",
+        "us",
+        "was",
+        "we",
+        "were",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "whom",
+        "why",
+        "will",
+        "with",
+        "would",
+        "you",
+        "your",
+        "he",
+        "his",
+        "her",
+        "about",
+        "into",
+        "than",
+        "then",
+        "there",
+        "these",
+        "those",
+        "am",
+        "been",
+        "being",
+        "can",
+        "could",
+        "should",
+        "if",
+        "any",
+        "all",
+    ]
+)
 
 
 class Index:
-    def __init__(self, path: Path, embedder: Embedder) -> None:
+    def __init__(self, path: Path | str, embedder: Embedder) -> None:
         self.path = path
         self.embedder = embedder
         self.db = sqlite3.connect(path, timeout=30, isolation_level=None, check_same_thread=False)
@@ -129,15 +210,36 @@ class Index:
         return [r["b"] if r["a"] == mem_id else r["a"] for r in out]
 
     def fts(self, query: str, limit: int = 50) -> list[tuple[str, float]]:
-        tokens = _TOKEN.findall(query)
+        tokens = [t for t in _TOKEN.findall(query) if t.lower() not in STOPWORDS]
         if not tokens:
             return []
         match = " OR ".join('"' + t.replace('"', "") + '"' for t in tokens)
         sql = "SELECT id, bm25(memories_fts) AS s FROM memories_fts WHERE memories_fts MATCH ? ORDER BY s LIMIT ?"
         return [(r["id"], -r["s"]) for r in self.db.execute(sql, (match, limit))]
 
+    def coverage(self, query: str) -> dict[str, float]:
+        """Share of the query's topic words (IDF-weighted) that each memory contains, 0..1.
+
+        One shared common word is weak evidence; most of the query's rare words is strong."""
+        tokens = list(dict.fromkeys(t.lower() for t in _TOKEN.findall(query) if t.lower() not in STOPWORDS))
+        total_docs = self.db.execute("SELECT count(*) FROM memories").fetchone()[0]
+        if not tokens or not total_docs:
+            return {}
+        weights: dict[str, float] = {}
+        hits: dict[str, set[str]] = {}
+        for tok in tokens:
+            rows = self.db.execute("SELECT id FROM memories_fts WHERE memories_fts MATCH ?", (f'"{tok}"',))
+            hits[tok] = {r["id"] for r in rows}
+            weights[tok] = 1.0 + math.log(1 + total_docs / (1 + len(hits[tok])))  # smoothed IDF
+        total = sum(weights.values())
+        out: dict[str, float] = {}
+        for tok, ids in hits.items():
+            for mem_id in ids:
+                out[mem_id] = out.get(mem_id, 0.0) + weights[tok] / total
+        return out
+
     def vector_search(self, query: str, limit: int = 50) -> list[tuple[str, float]]:
-        q = self.embedder.embed(query)
+        q = self.embedder.embed_query(query)
         scored = [
             (r["id"], cosine(q, unpack(r["vec"])))
             for r in self.db.execute("SELECT id, vec FROM vectors WHERE model=?", (self.embedder.name,))
@@ -148,6 +250,9 @@ class Index:
     def vector(self, mem_id: str) -> list[float] | None:
         row = self.db.execute("SELECT vec FROM vectors WHERE id=?", (mem_id,)).fetchone()
         return unpack(row["vec"]) if row else None
+
+    def vector_models(self) -> set[str]:
+        return {r[0] for r in self.db.execute("SELECT DISTINCT model FROM vectors")}
 
     def all_ids(self, table: str) -> set[str]:
         return {r[0] for r in self.db.execute(f"SELECT id FROM {table}")}

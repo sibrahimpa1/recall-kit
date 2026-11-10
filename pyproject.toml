@@ -1,6 +1,6 @@
 [project]
 name = "recall-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Persistent memory and project continuity for AI agents: markdown-first, git-versioned, hybrid-indexed, shared over MCP."
 readme = "README.md"
 license = "MIT"
@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 eval = ["anthropic>=0.70"]
+semantic = ["fastembed>=0.4"]
 
 [project.scripts]
 rk = "recall_kit.cli:app"

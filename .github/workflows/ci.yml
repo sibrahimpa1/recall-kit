@@ -15,6 +15,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --frozen --all-extras
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/recall-models
+          key: fastembed-all-MiniLM-L6-v2
       - name: Lint
         run: |
           uv run ruff check src tests evals scripts
@@ -23,8 +28,14 @@ jobs:
         run: uv run mypy
       - name: Continuity suite (fresh process per session)
         run: uv run pytest -m continuity -v --junitxml=continuity.xml
-      - name: Remaining tests (backups, ICS, tokens, eval skip)
+      - name: Remaining tests (backups, ICS, tokens, import, dashboard, semantic model)
+        env:
+          RECALL_MODEL_CACHE: ~/.cache/recall-models
         run: uv run pytest -m "not continuity" -v --junitxml=other.xml
+      - name: Retrieval benchmark (keyword vs hashing vs local semantic model)
+        env:
+          RECALL_MODEL_CACHE: ~/.cache/recall-models
+        run: uv run python evals/retrieval_bench.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: LLM-in-the-loop eval (runs only if the repo has an ANTHROPIC_API_KEY secret)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

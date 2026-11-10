@@ -77,7 +77,7 @@ def test_backup_cli_disaster_recovery(
     shutil.rmtree(home)  # the VPS disk is gone
     cli_json(home, "backup", "restore", made["path"], "--to", str(home))
     assert cli_json(home, "doctor")["ok"]
-    assert "net-30" in cli(home, "recall", "Tallow invoices").stdout
+    assert "net-45" in cli(home, "recall", "Tallow invoices").stdout
 
 
 def test_backup_needs_a_passphrase(

@@ -8,7 +8,15 @@ COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN uv sync --frozen --no-dev && mkdir -p /data && chown -R recall /app /data
+# SEMANTIC=1 adds the local embedding model (about 420 MB more) and bakes it into the image,
+# so the read-only container never downloads anything at runtime.
+ARG SEMANTIC=0
+ENV RECALL_MODEL_CACHE=/app/models
+RUN if [ "$SEMANTIC" = "1" ]; then \
+      uv sync --frozen --no-dev --extra semantic \
+      && RECALL_EMBEDDER=semantic .venv/bin/python -c "from recall_kit.embed import FastEmbedEmbedder; FastEmbedEmbedder().embed('warm up')"; \
+    else uv sync --frozen --no-dev; fi \
+    && mkdir -p /data /app/models && chown -R recall /app /data
 
 USER recall
 ENV RECALL_HOME=/data/store \

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -17,6 +18,11 @@ _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
 
 
 def utcnow() -> str:
+    """Current UTC time. RECALL_NOW (ISO, e.g. 2026-10-20T09:00:00Z) overrides the clock so demos
+    and tests can build a history spread over weeks; never set it in normal use."""
+    fake = os.environ.get("RECALL_NOW")
+    if fake:
+        return fake
     return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 

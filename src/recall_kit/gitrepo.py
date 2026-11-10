@@ -31,6 +31,9 @@ class GitRepo:
 
     def _run(self, *args: str, check: bool = True) -> str:
         env = {**os.environ, **_ENV}
+        fake_now = os.environ.get("RECALL_NOW")  # demo/test clock, see models.utcnow
+        if fake_now and args[0] == "commit":  # never while rewriting history
+            env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = fake_now
         proc = subprocess.run(
             ["git", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", *args],
             cwd=self.root,
@@ -63,6 +66,38 @@ class GitRepo:
     def last_commit(self, relpath: str) -> str | None:
         out = self._run("log", "-1", "--format=%H", "--", relpath, check=False)
         return out or None
+
+    def rev_before(self, iso_moment: str) -> str | None:
+        """Last commit made at or before the given moment."""
+        return self._run("rev-list", "-1", f"--before={iso_moment}", "HEAD", check=False) or None
+
+    def ls_files(self, rev: str, prefix: str) -> list[str]:
+        return self._run("ls-tree", "-r", "--name-only", rev, "--", prefix, check=False).splitlines()
+
+    def read_many(self, rev: str, relpaths: list[str]) -> list[str]:
+        """Contents of many files at one revision, in a single git process."""
+        if not relpaths:
+            return []
+        proc = subprocess.run(
+            ["git", "cat-file", "--batch"],
+            cwd=self.root,
+            input="".join(f"{rev}:{p}\n" for p in relpaths).encode(),
+            capture_output=True,
+        )
+        out, pos, texts = proc.stdout, 0, []
+        for _ in relpaths:
+            end = out.index(b"\n", pos)
+            size = int(out[pos:end].split()[-1])
+            texts.append(out[end + 1 : end + 1 + size].decode())
+            pos = end + 1 + size + 1
+        return texts
+
+    def log(self, limit: int = 200) -> list[dict[str, str]]:
+        out = self._run("log", f"-{limit}", "--format=%H%x09%cI%x09%s", check=False)
+        return [
+            dict(zip(("commit", "date", "message"), ln.split("\t", 2), strict=True))
+            for ln in out.splitlines()
+        ]
 
     def show(self, rev: str, relpath: str) -> str | None:
         proc = subprocess.run(

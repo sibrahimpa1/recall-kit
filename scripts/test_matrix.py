@@ -11,6 +11,10 @@ GROUPS = {
     "test_http_auth": "HTTP + scoped tokens",
     "test_ops": "Backups / brief / ICS / tokens",
     "test_llm_eval": "LLM-in-the-loop",
+    "test_time_travel": "Time travel + supersession",
+    "test_import": "Import",
+    "test_dashboard": "Dashboard",
+    "test_semantic": "Semantic model",
 }
 
 

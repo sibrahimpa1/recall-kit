@@ -42,6 +42,9 @@ Point DNS at the VPS first, open only 22/80/443 (`ufw allow 22,80,443/tcp`), and
 | Review conflicts | `rk conflicts`, then `rk correct <old-id> "..." --source "..."` or `rk forget <id> --yes` |
 | Review quarantined memories | `rk list --status ""` → look for `quarantined: true`, then `rk approve <id>` or `rk forget <id> --yes` |
 | Calendar of follow-ups | `rk ics --out followups.ics` (import, or serve the file and subscribe) |
+| Browse everything | `rk ui --open` (read-only; on a VPS: `ssh -L 8766:127.0.0.1:8766 you@server`, then run `rk ui` there) |
+| What did we know on a date | `rk recall "X" --as-of 2026-10-25` |
+| Import existing notes | `rk import notes.txt --origin "ChatGPT saved memories" --dry-run`, then without `--dry-run` |
 | Health check | `rk doctor` (exit 1 = drift between files, index, vectors or git) |
 | History of a memory | `rk history <id>`, or `git -C $RECALL_HOME log -p memories/<id>.md` |
 
@@ -56,7 +59,9 @@ You can also edit the markdown files by hand (in an editor or Obsidian). Then ru
 | `401 unauthorized` | token missing, mistyped or revoked | compare `sha256(secret)` with the line in `RECALL_TOKENS`; restart after changing `.env` |
 | `lacks the 'write' scope` | token is read-only | issue a token with the right scopes, or keep it read-only on purpose |
 | `Invalid Host header` in logs | `RECALL_ALLOWED_HOSTS` misses your domain | add `memory.example.com` (and `:*` variants if you use ports) |
-| Recall misses something you know is there | the wording is far from the stored text (the default embedder is lexical, not semantic) | search with the client's or project's name; add `tags`; or plug in a semantic embedder (§7) |
+| Recall misses something you know is there | `rk stats` shows `embedder: hashing-v1-384` (the keyword-level fallback) | `uv sync --extra semantic` (Docker: `SEMANTIC=1`); the store re-indexes itself on the next start |
+| Recall returns nothing for a vague question | the relevance gate found no real evidence | expected; ask with the client's or project's name, or check `rk list` |
+| A bad import | wrong file or too much noise | `rk list` shows the `imported` tag and source; `rk forget <id> --yes` per item, or restore last night's backup |
 | `rk doctor` reports `orphan_*` or `missing_from_index` | index out of sync (crash mid-write, a restored old index) | `rk reindex`; recall already ignores and heals orphans |
 | `uncommitted_changes` in doctor | manual edit not committed | `git -C $RECALL_HOME add -A && git -C $RECALL_HOME commit -m "manual edit"` |
 | Slow `forget` | it rewrites git history (`filter-branch`); this grows with commit count | expected (seconds for thousands of commits); see §7 for `git filter-repo` |
@@ -119,12 +124,15 @@ restore from a backup taken before the incident onto a fresh VPS, and diff
 
 | Want | Where |
 |---|---|
-| A semantic embedding model (Voyage, OpenAI, a local sentence-transformer) | implement `Embedder` (`name`, `dim`, `embed()`) in `src/recall_kit/embed.py` and pass it to `MemoryStore(embedder=...)`. Vectors carry the model name, so run `rk reindex` after switching. |
+| A different embedding model (Voyage, OpenAI, a multilingual model) | implement `Embedder` in `src/recall_kit/embed.py` (`embed`, `embed_query`, plus `min_similarity`, `conflict_similarity`, `vector_weight`) and return it from `default_embedder()`. Set the thresholds from `uv run python evals/retrieval_bench.py`, not by guessing. The store re-indexes itself when the model name changes. |
 | New memory type | `MEMORY_TYPES` in `models.py` |
 | New MCP tool | add a `@tool` function in `server.py`, call `_guard(ctx, "<scope>")` first |
 | Stricter injection screening | `INJECTION_PATTERNS` in `safety.py`. Add the new case to `INJECTIONS` / `BENIGN` in `tests/test_failure_modes.py` |
 | Faster forget on large histories | swap `GitRepo.purge` to `git filter-repo --invert-paths` when it is installed |
 | Notion / calendar sync | read `rk brief --json` or `rk ics`. The store is plain files, so one-way exports are cheap |
+
+`RECALL_NOW` overrides the clock (it backdates the demo data and the time-travel tests). Never set it
+in normal use.
 
 Before deploying any change, run `uv run pytest`. The continuity suite takes about a minute and catches
 regressions in recall, correction, deletion, citation and resume.

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>recall-kit</title>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1c1d1f; --muted: #6b6f76; --line: #e3e1da;
+  --accent: #0f766e; --accent-soft: #d9f0ec; --warn: #b45309; --warn-soft: #fdf0d5;
+  --bad: #b42318; --bad-soft: #fde4e1; --ok: #2f6f3e; --ok-soft: #dff1e2; --old: #8a8f98;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #131416; --panel: #1c1e21; --ink: #ececec; --muted: #9a9fa8; --line: #2d3035;
+    --accent: #4fd1c5; --accent-soft: #123b38; --warn: #f0b35a; --warn-soft: #3d2d10;
+    --bad: #ff8a80; --bad-soft: #43201d; --ok: #7fd392; --ok-soft: #17351f; --old: #7b808a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, "Segoe UI", Inter, Roboto, sans-serif; }
+header { padding: 20px 24px 0; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); font-size: 13px; font-family: var(--mono); overflow-wrap: anywhere; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+.pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+.pill b { font-variant-numeric: tabular-nums; }
+.pill.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+nav { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+nav button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 60px; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; align-items: end; }
+.bar label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+input, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+input[type=search] { min-width: min(420px, 78vw); }
+input:focus-visible, select:focus-visible, button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font: inherit; color: var(--ink); cursor: pointer; }
+.note { background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.grid.split { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+@media (max-width: 860px) { .grid.split { grid-template-columns: minmax(0, 1fr); } }
+.list { display: grid; gap: 10px; align-content: start; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; text-align: left; width: 100%; font: inherit; color: inherit; }
+button.card { cursor: pointer; }
+button.card[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.content { margin: 6px 0 8px; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.meta code, code { font-family: var(--mono); font-size: 12px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag { font-size: 11.5px; border-radius: 6px; padding: 2px 7px; background: var(--line); color: var(--ink); }
+.tag.type { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.old { background: transparent; border: 1px solid var(--line); color: var(--old); }
+.stale .content { color: var(--old); text-decoration: line-through; text-decoration-color: var(--line); }
+h2 { font-size: 15px; margin: 0 0 10px; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 6px; }
+ul { margin: 0; padding-left: 18px; }
+li { margin: 3px 0; overflow-wrap: anywhere; }
+.versions { border-left: 2px solid var(--line); margin-left: 6px; padding-left: 16px; display: grid; gap: 14px; }
+.version { position: relative; }
+.version::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.version.current::before { background: var(--accent); }
+.empty { color: var(--muted); padding: 24px 4px; }
+.vs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+@media (max-width: 640px) { .vs { grid-template-columns: minmax(0, 1fr); } }
+pre { font-family: var(--mono); font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.log { font-family: var(--mono); font-size: 12.5px; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; }
+.log time { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>recall<span>-kit</span></h1>
+  <div class="sub" id="home"></div>
+  <div class="pills" id="pills"></div>
+  <nav role="tablist" id="tabs"></nav>
+</header>
+<main id="main"></main>
+<script>
+"use strict";
+// All memory content is untrusted data: it is only ever inserted with textContent.
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v; else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return el;
+};
+const api = async (path) => (await fetch(path)).json();
+const short = (sha) => (sha || "").slice(0, 8);
+const day = (iso) => (iso || "").slice(0, 10);
+const main = document.getElementById("main");
+const state = { tab: "Memories", q: "", type: "", status: "active", asOf: "", selected: null, history: null };
+const TABS = ["Memories", "Projects", "Review", "Activity"];
+
+function tabs(reviewCount) {
+  const nav = document.getElementById("tabs");
+  nav.replaceChildren(...TABS.map((t) => h("button", { role: "tab", "aria-selected": String(state.tab === t),
+    onclick: () => { state.tab = t; render(); } }, t === "Review" && reviewCount ? `Review (${reviewCount})` : t)));
+}
+
+async function header() {
+  const o = await api("/api/overview");
+  state.overview = o;
+  document.getElementById("home").textContent = `${o.stats.home}  ·  embedder: ${o.stats.embedder}`;
+  const needs = o.brief.memory_conflicts + o.brief.quarantined_memories.length;
+  const pill = (label, n, warn) => h("span", { class: "pill" + (warn && n ? " warn" : "") }, h("b", {}, n), " ", label);
+  document.getElementById("pills").replaceChildren(
+    pill("current", o.stats.active), pill("superseded", o.stats.superseded),
+    pill("conflicts", o.brief.memory_conflicts, true), pill("quarantined", o.brief.quarantined_memories.length, true),
+    pill("overdue follow-ups", o.brief.overdue_followups.length, true), pill("stale projects", o.brief.stale_projects.length, true));
+  tabs(needs);
+}
+
+function memoryCard(m, opts = {}) {
+  const stale = m.status !== "active";
+  const tagsRow = h("div", { class: "tags" },
+    h("span", { class: "tag type" }, m.type),
+    stale ? h("span", { class: "tag old" }, "superseded") : null,
+    m.quarantined ? h("span", { class: "tag bad" }, "quarantined: " + (m.quarantine_reason || "review")) : null,
+    m.conflicts_with ? h("span", { class: "tag warn" }, "conflict") : null,
+    m.changed_since ? h("span", { class: "tag warn" }, "changed since") : null,
+    m.matched_earlier_version ? h("span", { class: "tag ok" }, "matched an earlier version") : null,
+    m.project ? h("span", { class: "tag" }, m.project) : null,
+    (m.tags || []).map((t) => h("span", { class: "tag" }, "#" + t)));
+  const body = [tagsRow, h("div", { class: "content" }, m.content),
+    m.rationale ? h("div", { class: "meta" }, "why: " + m.rationale) : null,
+    h("div", { class: "meta" }, "source: ", m.source.origin, " · ", h("code", {}, `${m.source.file} @ ${short(m.source.commit)}`), " · ", day(m.source.updated))];
+  if (opts.static) return h("div", { class: "card" + (stale ? " stale" : "") }, body);
+  return h("button", { class: "card" + (stale ? " stale" : ""), "aria-pressed": String(state.selected === m.id),
+    onclick: async () => { state.selected = m.id; state.history = await api("/api/memory/" + m.id); render(); } }, body);
+}
+
+function historyPanel() {
+  if (!state.history || state.history.error) return h("div", { class: "empty" }, "Select a memory to see every version and its commits.");
+  const hist = state.history;
+  return h("div", {}, h("h2", {}, `Version history (${hist.versions.length})`),
+    h("div", { class: "versions" }, hist.versions.slice().reverse().map((v) =>
+      h("div", { class: "version" + (v.id === hist.current ? " current" : "") },
+        h("div", { class: "tags" }, h("span", { class: "tag " + (v.id === hist.current ? "ok" : "old") }, v.id === hist.current ? "current" : "superseded"),
+          h("code", {}, v.citation)),
+        h("div", { class: "content" }, v.content),
+        v.rationale ? h("div", { class: "meta" }, "reason: " + v.rationale) : null,
+        h("div", { class: "meta" }, "source: " + v.source.origin),
+        h("div", { class: "meta" }, v.git.map((g) => h("div", {}, h("code", {}, short(g.commit)), ` ${day(g.date)}  ${g.message}`)))))));
+}
+
+async function memoriesTab() {
+  const p = new URLSearchParams({ q: state.q, type: state.type, status: state.status, as_of: state.asOf });
+  const res = await api("/api/memories?" + p);
+  const hist = (state.overview || {}).history || {};
+  const rerun = () => { state.selected = null; state.history = null; render(); };
+  const bar = h("div", { class: "bar" },
+    h("label", {}, "Search (hybrid recall)", h("input", { type: "search", id: "q", value: state.q, placeholder: "e.g. Tallow invoice terms",
+      onkeydown: (e) => { if (e.key === "Enter") { state.q = e.target.value; rerun(); } } })),
+    h("label", {}, "Type", select(["", "fact", "preference", "decision", "project"], state.type, (v) => { state.type = v; rerun(); }, "all types")),
+    h("label", {}, "Show", select(["active", "all", "quarantined"], state.status, (v) => { state.status = v; rerun(); })),
+    h("label", {}, "As of date (time travel)", h("input", { type: "date", value: state.asOf, min: hist.first, max: hist.last,
+      onchange: (e) => { state.asOf = e.target.value; rerun(); } })),
+    state.asOf ? h("button", { class: "btn", onclick: () => { state.asOf = ""; rerun(); } }, "Back to now") : null);
+  const note = res.as_of ? h("div", { class: "note" }, res.message ? res.message :
+    ["Showing memory as it stood on ", h("b", {}, state.asOf), " (snapshot ", h("code", {}, short(res.snapshot_commit)), "). Items marked “changed since” are no longer current."]) : null;
+  const items = res.items || [];
+  const list = h("div", { class: "list" }, items.length ? items.map((m) => memoryCard(m)) :
+    h("div", { class: "empty" }, res.error || (state.q ? "Nothing relevant found. recall-kit returns nothing rather than the nearest unrelated memory." : "No memories.")));
+  main.replaceChildren(...[bar, note, h("div", { class: "grid split" }, list, h("div", { class: "card" }, historyPanel()))].filter(Boolean));
+}
+
+function select(values, current, onpick, emptyLabel) {
+  const s = h("select", { onchange: (e) => onpick(e.target.value) }, values.map((v) => h("option", { value: v, selected: v === current }, v || emptyLabel)));
+  s.value = current;
+  return s;
+}
+
+async function projectsTab() {
+  const projects = await api("/api/projects");
+  const items = (title, rows, fmt) => [h("h3", {}, title), rows.length ? h("ul", {}, rows.map((r) => h("li", {}, fmt(r)))) : h("div", { class: "meta" }, "none")];
+  main.replaceChildren(h("div", { class: "list" }, projects.length ? projects.map((p) => h("div", { class: "card" },
+    h("div", { class: "tags" }, h("h2", { style: "margin:0" }, p.project),
+      h("span", { class: "tag " + ({ active: "ok", blocked: "bad", paused: "warn", done: "old" }[p.status] || "") }, p.status),
+      h("span", { class: "meta" }, `updated ${p.days_since_update} days ago`)),
+    h("div", { class: "content" }, p.summary),
+    p.last_status_note && p.last_status_note.note ? h("div", { class: "meta" }, "last note: " + p.last_status_note.note) : null,
+    items("Open blockers", p.open_blockers, (b) => `[${b.id}] ${b.text}`),
+    items("Next steps", p.next_steps, (n) => `[${n.id}] ${n.text}`),
+    items("Follow-ups", p.followups, (f) => [`[${f.id}] ${f.due} — ${f.text} `, f.overdue ? h("span", { class: "tag bad" }, "overdue") : null]),
+    items("Decisions", p.recent_decisions, (d) => [d.content, h("span", { class: "meta" }, ` — why: ${d.rationale || "?"} `), h("code", {}, d.citation)]),
+    h("div", { class: "meta", style: "margin-top:12px" }, "source: ", h("code", {}, `${p.source.file} @ ${short(p.source.commit)}`)))) :
+    h("div", { class: "empty" }, "No projects yet.")));
+}
+
+async function reviewTab() {
+  const r = await api("/api/review");
+  const conflicts = r.conflicts.map((c) => h("div", { class: "card" },
+    h("div", { class: "vs" }, h("div", {}, h("h3", { style: "margin-top:0" }, "Older"), memoryCard(c.older, { static: true })),
+      h("div", {}, h("h3", { style: "margin-top:0" }, "Newer (ranked first)"), memoryCard(c.newer, { static: true }))),
+    h("div", { class: "meta", style: "margin-top:10px" }, "Resolve from the CLI or ask your agent:"),
+    h("pre", {}, `rk correct ${c.older.id} "<the right value>" --source "<who said so, when>"\nrk forget ${c.older.id} --yes`)));
+  const quarantined = r.quarantined.map((m) => h("div", { class: "card" }, memoryCard(m, { static: true }),
+    h("pre", {}, `rk approve ${m.id}        # it is fine, allow it in recall\nrk forget ${m.id} --yes   # delete it`)));
+  main.replaceChildren(
+    h("h2", {}, `Conflicts (${conflicts.length})`), h("div", { class: "list" }, conflicts.length ? conflicts : h("div", { class: "empty" }, "No current memories disagree.")),
+    h("h2", { style: "margin-top:22px" }, `Quarantined (${quarantined.length})`),
+    h("div", { class: "meta", style: "margin-bottom:10px" }, "Text that reads like instructions to an agent, or contains a secret, is stored but never recalled until a person approves it."),
+    h("div", { class: "list" }, quarantined.length ? quarantined : h("div", { class: "empty" }, "Nothing is waiting for review.")));
+}
+
+async function activityTab() {
+  const log = await api("/api/activity");
+  main.replaceChildren(h("div", { class: "card" }, h("h2", {}, "Store history (git)"),
+    h("div", { class: "meta", style: "margin-bottom:10px" }, "Every change is a commit. Messages carry ids and actions only, never memory content."),
+    h("div", { class: "log" }, log.flatMap((c) => [h("time", {}, c.date.slice(0, 16).replace("T", " ")), h("span", {}, h("code", {}, short(c.commit)), "  " + c.message)]))));
+}
+
+async function render() {
+  tabs((state.overview ? state.overview.brief.memory_conflicts + state.overview.brief.quarantined_memories.length : 0));
+  await ({ Memories: memoriesTab, Projects: projectsTab, Review: reviewTab, Activity: activityTab })[state.tab]();
+}
+header().then(render);
+</script>
+</body>
+</html>

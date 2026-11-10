@@ -103,18 +103,37 @@ def recall(
     type: Annotated[str | None, typer.Option("--type", "-t")] = None,
     project: str | None = None,
     all_versions: Annotated[bool, typer.Option("--all-versions")] = False,
+    as_of: Annotated[
+        str | None, typer.Option("--as-of", help="Answer as of a date (YYYY-MM-DD) or ISO time")
+    ] = None,
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Hybrid search; every hit shows its source."""
-    res = _store().recall(query, k=k, type=type, project=project, include_superseded=all_versions)
+    """Hybrid search; every hit shows its source. --as-of travels back in time."""
+    try:
+        res = _store().recall(
+            query, k=k, type=type, project=project, include_superseded=all_versions, as_of=as_of
+        )
+    except StoreError as exc:
+        return _fail(exc)
     if as_json:
         return _out(res)
-    table = Table(title=f"recall: {query!r}", show_lines=True)
+    if not res["results"]:
+        console.print(f"recall: {query!r}", highlight=False)
+        console.print(
+            "[dim]No relevant memory. recall-kit returns nothing rather than the nearest unrelated one.[/dim]"
+        )
+        return None
+    title = f"recall: {query!r}" + (f"  (as of {as_of})" if as_of else "")
+    table = Table(title=title, show_lines=True)
     for col in ("citation", "type", "content", "source"):
         table.add_column(col, overflow="fold")
     for r in res["results"]:
         src = r["source"]
         flag = " [yellow](conflict)[/yellow]" if r.get("conflicts_with") else ""
+        if r.get("changed_since"):
+            flag += " [yellow](changed since)[/yellow]"
+        if r.get("matched_earlier_version"):
+            flag += " [dim](matched an earlier version)[/dim]"
         table.add_row(
             escape(r["citation"]),
             r["type"],
@@ -343,6 +362,31 @@ def token_new(
     typer.echo(secret)
     console.print("[bold]Server entry[/bold] (append to RECALL_TOKENS, separated by ';'):")
     typer.echo(line)
+
+
+@app.command("import")
+def import_(
+    path: Path,
+    origin: Annotated[str, typer.Option(help='Where this came from, e.g. "ChatGPT saved memories"')],
+    project: str | None = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be imported")] = False,
+) -> None:
+    """Import a text/markdown file or a folder of notes (ChatGPT/Claude memory lists, Notion export)."""
+    from .importer import collect, import_items
+
+    try:
+        items = collect(path, origin)
+    except (OSError, StoreError) as exc:
+        return _fail(exc)
+    _out(import_items(_store(), items, project=project, dry_run=dry_run, actor=ACTOR))
+
+
+@app.command()
+def ui(port: int = 8766, open_browser: Annotated[bool, typer.Option("--open")] = False) -> None:
+    """Read-only web dashboard on http://127.0.0.1:PORT (local only)."""
+    from . import ui as dashboard
+
+    dashboard.run(port, open_browser=open_browser)
 
 
 @app.command()
