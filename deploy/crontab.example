@@ -1,0 +1,9 @@
+# VPS host crontab (crontab -e). Times are server-local.
+# 07:30 daily brief -> mail/Slack/ntfy (pipe it wherever you read it)
+30 7 * * *  cd /opt/recall-kit && docker compose -f deploy/docker-compose.yml exec -T recall rk brief > /var/log/recall-brief.md
+# 02:15 encrypted backup, keep 14, then prove the newest one restores
+15 2 * * *  cd /opt/recall-kit && docker compose -f deploy/docker-compose.yml exec -T recall sh -c 'rk backup create --out /backups && rk backup prune --out /backups --keep 14 && rk backup verify "$(ls -1 /backups/recall-*.rkb | tail -1)"' >> /var/log/recall-backup.log 2>&1
+# 02:45 copy backups off the box (any S3-compatible bucket / rclone remote)
+45 2 * * *  rclone copy /opt/recall-kit/deploy/backups remote:recall-backups --max-age 48h
+# Sunday 03:00 consistency check (non-zero exit = investigate)
+0 3 * * 0   cd /opt/recall-kit && docker compose -f deploy/docker-compose.yml exec -T recall rk doctor >> /var/log/recall-doctor.log 2>&1

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "recall": {
+      "command": "/Users/you/.local/bin/uv",
+      "args": ["run", "--quiet", "--directory", "/path/to/recall-kit", "rk", "serve"],
+      "env": { "RECALL_HOME": "/Users/you/.recall-kit" }
+    }
+  }
+}

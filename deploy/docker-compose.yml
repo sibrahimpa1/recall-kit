@@ -1,0 +1,36 @@
+# Small-VPS deploy: recall-kit (HTTP MCP) behind Caddy (automatic TLS).
+#   cp .env.example .env   # fill RECALL_TOKENS, RECALL_BACKUP_PASSPHRASE, DOMAIN, RECALL_ALLOWED_HOSTS
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+services:
+  recall:
+    build: ..
+    restart: unless-stopped
+    env_file:
+      - path: ../.env
+        required: true   # holds RECALL_TOKENS + RECALL_BACKUP_PASSPHRASE
+    environment:
+      RECALL_HOME: /data/store
+    volumes:
+      - recall-data:/data
+      - ./backups:/backups
+    expose: ["8765"]          # only reachable through Caddy, never published directly
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [recall]
+
+volumes:
+  recall-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__recall__memory_recall",
+      "mcp__recall__memory_history",
+      "mcp__recall__memory_conflicts",
+      "mcp__recall__memory_stats",
+      "mcp__recall__project_resume",
+      "mcp__recall__project_list",
+      "mcp__recall__daily_brief",
+      "mcp__recall__memory_remember",
+      "mcp__recall__project_update",
+      "mcp__recall__project_add",
+      "mcp__recall__project_close",
+      "mcp__recall__project_decide"
+    ],
+    "ask": [
+      "mcp__recall__memory_correct",
+      "mcp__recall__memory_forget"
+    ]
+  }
+}

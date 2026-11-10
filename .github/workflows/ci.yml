@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --all-extras
+      - name: Lint
+        run: |
+          uv run ruff check src tests evals scripts
+          uv run ruff format --check src tests evals scripts
+      - name: Type check
+        run: uv run mypy
+      - name: Continuity suite (fresh process per session)
+        run: uv run pytest -m continuity -v --junitxml=continuity.xml
+      - name: Remaining tests (backups, ICS, tokens, eval skip)
+        run: uv run pytest -m "not continuity" -v --junitxml=other.xml
+      - name: LLM-in-the-loop eval (runs only if the repo has an ANTHROPIC_API_KEY secret)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run python evals/llm_eval.py
+      - name: Test matrix
+        if: always()
+        run: uv run python scripts/test_matrix.py continuity.xml other.xml >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: "*.xml"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t recall-kit .
+      - name: Smoke test (health, 401 without token)
+        run: |
+          docker run -d --name rk -p 8765:8765 -e RECALL_TOKENS="ci:read:$(printf ci-secret | sha256sum | cut -d' ' -f1)" recall-kit
+          for i in $(seq 1 30); do curl -sf localhost:8765/healthz && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8765/mcp)" = 401

@@ -1,0 +1,22 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+	# Only the MCP endpoint and the health check are exposed.
+	@app path /mcp /mcp/* /healthz
+	handle @app {
+		reverse_proxy recall:8765 {
+			flush_interval -1
+		}
+	}
+	handle {
+		respond 404
+	}
+	log {
+		output stdout
+		format json
+	}
+}

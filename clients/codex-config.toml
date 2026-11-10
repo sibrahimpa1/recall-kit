@@ -1,0 +1,12 @@
+# ~/.codex/config.toml
+
+# Local, same store as Claude Code / Claude Desktop
+[mcp_servers.recall]
+command = "uv"
+args = ["run", "--quiet", "--directory", "/path/to/recall-kit", "rk", "serve"]
+env = { RECALL_HOME = "/Users/you/.recall-kit" }
+
+# Remote VPS over Streamable HTTP (token read from the environment, never written here)
+# [mcp_servers.recall]
+# url = "https://memory.example.com/mcp"
+# bearer_token_env_var = "RECALL_TOKEN"
